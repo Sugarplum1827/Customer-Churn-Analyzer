@@ -101,21 +101,41 @@ if uploaded_file is not None:
         
         # Analyze columns to help user identify binary columns
         binary_columns = []
+        binary_column_names = []
         for col in data.columns:
             unique_count = data[col].nunique()
             if unique_count == 2:
-                binary_columns.append(f"{col} (values: {', '.join(map(str, data[col].unique()))})")
+                values = data[col].unique()
+                binary_columns.append(f"{col} (values: {', '.join(map(str, values))})")
+                binary_column_names.append(col)
         
         if binary_columns:
             st.success(f"✅ Found {len(binary_columns)} binary columns suitable for churn prediction:")
             for col_info in binary_columns:
                 st.write(f"• {col_info}")
+            
+            # Auto-select likely churn column
+            default_target = None
+            churn_keywords = ['churn', 'churned', 'left', 'exited', 'attrition']
+            for col in binary_column_names:
+                if any(keyword in col.lower() for keyword in churn_keywords):
+                    default_target = col
+                    break
+            
+            if default_target:
+                st.info(f"💡 Automatically detected '{default_target}' as likely churn column")
+                default_index = data.columns.tolist().index(default_target)
+            else:
+                default_index = 0
+                
         else:
             st.warning("⚠️ No binary columns found. Churn prediction requires a column with exactly 2 unique values.")
+            default_index = 0
         
         target_column = st.selectbox(
             "Select target column:",
             options=data.columns.tolist(),
+            index=default_index if binary_columns else 0,
             help="Choose the column that indicates whether a customer churned (must have exactly 2 values)"
         )
         
