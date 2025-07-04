@@ -2,12 +2,10 @@ import streamlit as st
 import pandas as pd
 
 # Page configuration
-st.set_page_config(
-    page_title="Customer Churn Analysis Tool",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="Customer Churn Analysis Tool",
+                   page_icon="📊",
+                   layout="wide",
+                   initial_sidebar_state="expanded")
 
 # Main page
 st.title("📊 Customer Churn Analysis Tool")
@@ -35,7 +33,7 @@ if 'data' not in st.session_state:
     st.session_state.data = None
 if 'processed_data' not in st.session_state:
     st.session_state.processed_data = None
-if 'models' not in st.session_state:
+if "models" not in st.session_state:
     st.session_state.models = {}
 if 'model_results' not in st.session_state:
     st.session_state.model_results = {}

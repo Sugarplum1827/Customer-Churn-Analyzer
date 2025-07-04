@@ -3,159 +3,177 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 import streamlit as st
+import traceback
+
 
 class DataProcessor:
+
     def __init__(self):
         self.scaler = StandardScaler()
         self.label_encoders = {}
         self.imputers = {}
-        
+
     def preprocess_data(self, data, target_column):
         """
-        Comprehensive data preprocessing pipeline
+        Full preprocessing pipeline: handle missing values, encode, scale.
         """
         try:
-            # Make a copy to avoid modifying original data
             processed_data = data.copy()
-            
-            # Remove duplicates
+
+            # 1. Remove duplicates
             initial_rows = len(processed_data)
             processed_data = processed_data.drop_duplicates()
-            duplicates_removed = initial_rows - len(processed_data)
-            
-            if duplicates_removed > 0:
-                st.info(f"Removed {duplicates_removed} duplicate rows")
-            
-            # Handle missing values
+            removed = initial_rows - len(processed_data)
+            if removed > 0:
+                st.info(f"Removed {removed} duplicate rows")
+
+            # 2. Handle missing values
             processed_data = self._handle_missing_values(processed_data)
-            
-            # Separate features and target
-            feature_columns = [col for col in processed_data.columns if col != target_column]
-            
-            # Encode categorical variables
-            processed_data = self._encode_categorical_variables(processed_data, feature_columns)
-            
-            # Handle target variable
-            processed_data = self._prepare_target_variable(processed_data, target_column)
-            
-            # Feature scaling for numerical variables
-            numerical_columns = processed_data[feature_columns].select_dtypes(include=[np.number]).columns
-            if len(numerical_columns) > 0:
-                processed_data[numerical_columns] = self.scaler.fit_transform(processed_data[numerical_columns])
-            
-            # Update feature columns after encoding
-            final_feature_columns = [col for col in processed_data.columns if col != target_column]
-            
-            return processed_data, final_feature_columns
-            
+
+            # 3. Validate and encode the target column FIRST
+            processed_data = self._prepare_target_variable(
+                processed_data, target_column)
+
+            # 4. Define feature columns
+            feature_columns = [
+                col for col in processed_data.columns if col != target_column
+            ]
+
+            # 5. Encode categorical variables (excluding target)
+            processed_data = self._encode_categorical_variables(
+                processed_data, feature_columns, target_column)
+
+            # 6. Update feature columns post-encoding
+            feature_columns = [
+                col for col in processed_data.columns if col != target_column
+            ]
+
+            # 7. Scale numeric features
+            numeric_cols = processed_data[feature_columns].select_dtypes(
+                include=[np.number]).columns
+            if len(numeric_cols) > 0:
+                processed_data[numeric_cols] = self.scaler.fit_transform(
+                    processed_data[numeric_cols])
+
+            # Return
+            return processed_data, feature_columns
+
         except Exception as e:
-            st.error(f"Error in data preprocessing: {str(e)}")
+            st.error("❌ Error in data preprocessing:")
+            st.code(traceback.format_exc())
             raise e
-    
+
     def _handle_missing_values(self, data):
         """
-        Handle missing values in the dataset
+        Impute missing values with median (numeric) or mode (categorical)
         """
         missing_counts = data.isnull().sum()
-        columns_with_missing = missing_counts[missing_counts > 0]
-        
-        if len(columns_with_missing) > 0:
-            st.info(f"Handling missing values in {len(columns_with_missing)} columns")
-            
-            for column in columns_with_missing.index:
-                if data[column].dtype in ['object', 'category']:
-                    # For categorical variables, use mode
+        cols_with_missing = missing_counts[missing_counts > 0]
+
+        if len(cols_with_missing) > 0:
+            st.info(
+                f"Handling missing values in {len(cols_with_missing)} columns")
+
+            for col in cols_with_missing.index:
+                if data[col].dtype in ['object', 'category']:
                     imputer = SimpleImputer(strategy='most_frequent')
-                    data[column] = imputer.fit_transform(data[[column]]).ravel()
                 else:
-                    # For numerical variables, use median
                     imputer = SimpleImputer(strategy='median')
-                    data[column] = imputer.fit_transform(data[[column]]).ravel()
-                
-                self.imputers[column] = imputer
-        
+
+                data[col] = imputer.fit_transform(data[[col]]).ravel()
+                self.imputers[col] = imputer
+
         return data
-    
-    def _encode_categorical_variables(self, data, feature_columns):
+
+    def _encode_categorical_variables(self, data, feature_columns,
+                                      target_column):
         """
-        Encode categorical variables using label encoding and one-hot encoding
+        Encode categorical variables using one-hot (low cardinality) or label encoding (high)
         """
-        categorical_columns = data[feature_columns].select_dtypes(include=['object', 'category']).columns
-        
-        if len(categorical_columns) > 0:
-            st.info(f"Encoding {len(categorical_columns)} categorical variables")
-            
-            for column in categorical_columns:
-                unique_values = data[column].nunique()
-                
-                if unique_values <= 10:  # Use one-hot encoding for low cardinality
+        cat_cols = [
+            col for col in data[feature_columns].select_dtypes(
+                include=['object', 'category']).columns if col != target_column
+        ]
+
+        if len(cat_cols) > 0:
+            st.info(f"Encoding {len(cat_cols)} categorical variables")
+
+            for col in cat_cols:
+                n_unique = data[col].nunique()
+
+                if n_unique <= 10:
                     # One-hot encoding
-                    dummies = pd.get_dummies(data[column], prefix=column, drop_first=True)
-                    data = pd.concat([data, dummies], axis=1)
-                    data = data.drop(column, axis=1)
-                else:  # Use label encoding for high cardinality
+                    dummies = pd.get_dummies(data[col],
+                                             prefix=col,
+                                             drop_first=True)
+                    data = pd.concat([data.drop(columns=col), dummies], axis=1)
+                else:
                     # Label encoding
                     le = LabelEncoder()
-                    data[column] = le.fit_transform(data[column].astype(str))
-                    self.label_encoders[column] = le
-        
+                    data[col] = le.fit_transform(data[col].astype(str))
+                    self.label_encoders[col] = le
+
         return data
-    
+
     def _prepare_target_variable(self, data, target_column):
         """
-        Prepare target variable for binary classification
+        Validate and encode target for binary classification (0/1)
         """
-        target_values = data[target_column].unique()
-        
-        # Convert target to binary if needed
-        if len(target_values) == 2:
-            if data[target_column].dtype == 'object':
-                # Convert string labels to 0/1
-                le = LabelEncoder()
-                data[target_column] = le.fit_transform(data[target_column])
-                self.label_encoders[target_column] = le
+        values = data[target_column].unique()
+
+        if len(values) != 2:
+            st.error(
+                f"❌ The selected target column '{target_column}' has {len(values)} unique values."
+            )
+            if len(values) <= 10:
+                st.dataframe(
+                    data[target_column].value_counts().to_frame("Count"))
+                st.info(
+                    "💡 You might need to map these values to binary (e.g., 'Yes'/'No' → 1/0)."
+                )
             else:
-                # Ensure values are 0 and 1
-                unique_vals = sorted(data[target_column].unique())
-                if unique_vals != [0, 1]:
-                    data[target_column] = data[target_column].map({unique_vals[0]: 0, unique_vals[1]: 1})
+                st.write(f"Sample values: {list(values[:10])}")
+                st.info(
+                    "💡 Too many unique values — this is not suitable for binary churn prediction."
+                )
+            raise ValueError(
+                f"Target variable must have exactly 2 unique values, found {len(values)}"
+            )
+
+        # Binary encoding
+        if data[target_column].dtype == 'object':
+            le = LabelEncoder()
+            data[target_column] = le.fit_transform(data[target_column])
+            self.label_encoders[target_column] = le
         else:
-            # Provide more helpful error message
-            st.error(f"❌ The selected target column '{target_column}' has {len(target_values)} unique values.")
-            st.error("For churn prediction, the target column should contain exactly 2 values (e.g., 0/1, Yes/No, True/False).")
-            
-            if len(target_values) <= 10:
-                st.write("**Available values in this column:**")
-                value_counts = data[target_column].value_counts()
-                st.dataframe(value_counts.to_frame('Count'), use_container_width=True)
-                st.info("💡 If this column represents churn, you may need to create a binary version (e.g., convert 'Active'/'Inactive' to 0/1).")
-            else:
-                st.write(f"**Sample values:** {list(target_values[:10])}")
-                st.info("💡 This appears to be a continuous or high-cardinality categorical variable. Please select a binary column that indicates churn status.")
-            
-            raise ValueError(f"Target variable must have exactly 2 unique values for binary classification, found {len(target_values)}")
-        
+            sorted_vals = sorted(values)
+            if sorted_vals != [0, 1]:
+                data[target_column] = data[target_column].map({
+                    sorted_vals[0]: 0,
+                    sorted_vals[1]: 1
+                })
+
         return data
-    
+
     def transform_new_data(self, new_data, feature_columns):
         """
-        Transform new data using fitted preprocessors
+        Transform unseen data using stored scalers/encoders (for prediction phase)
         """
-        processed_data = new_data.copy()
-        
-        # Handle missing values
-        for column, imputer in self.imputers.items():
-            if column in processed_data.columns:
-                processed_data[column] = imputer.transform(processed_data[[column]]).ravel()
-        
-        # Encode categorical variables
-        for column, encoder in self.label_encoders.items():
-            if column in processed_data.columns:
-                processed_data[column] = encoder.transform(processed_data[column].astype(str))
-        
-        # Scale numerical features
-        numerical_columns = processed_data.select_dtypes(include=[np.number]).columns
-        if len(numerical_columns) > 0:
-            processed_data[numerical_columns] = self.scaler.transform(processed_data[numerical_columns])
-        
-        return processed_data[feature_columns]
+        data = new_data.copy()
+
+        # Impute
+        for col, imputer in self.imputers.items():
+            if col in data.columns:
+                data[col] = imputer.transform(data[[col]]).ravel()
+
+        # Encode
+        for col, encoder in self.label_encoders.items():
+            if col in data.columns:
+                data[col] = encoder.transform(data[col].astype(str))
+
+        # Scale
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            data[numeric_cols] = self.scaler.transform(data[numeric_cols])
+
+        return data[feature_columns]

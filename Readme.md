@@ -100,8 +100,6 @@ This is a Streamlit-based web application designed for comprehensive customer ch
 - **API Endpoints**: REST API development for external system integration
 - **Cloud Deployment**: Containerization and cloud platform deployment options
 
-## Changelog
-- July 04, 2025. Initial setup
 
 ## User Preferences
 
