@@ -60,12 +60,26 @@ if uploaded_file is not None:
         
         # Target column selection
         st.subheader("🎯 Target Column Selection")
-        st.write("Select the column that represents customer churn (0/1 or False/True)")
+        st.write("Select the column that represents customer churn (must have exactly 2 unique values)")
+        
+        # Analyze columns to help user identify binary columns
+        binary_columns = []
+        for col in data.columns:
+            unique_count = data[col].nunique()
+            if unique_count == 2:
+                binary_columns.append(f"{col} (values: {', '.join(map(str, data[col].unique()))})")
+        
+        if binary_columns:
+            st.success(f"✅ Found {len(binary_columns)} binary columns suitable for churn prediction:")
+            for col_info in binary_columns:
+                st.write(f"• {col_info}")
+        else:
+            st.warning("⚠️ No binary columns found. Churn prediction requires a column with exactly 2 unique values.")
         
         target_column = st.selectbox(
             "Select target column:",
             options=data.columns.tolist(),
-            help="Choose the column that indicates whether a customer churned"
+            help="Choose the column that indicates whether a customer churned (must have exactly 2 values)"
         )
         
         if target_column:
@@ -117,16 +131,64 @@ else:
     
     # Sample data format
     st.subheader("📝 Expected Data Format")
-    st.write("Your CSV should contain customer features and a target column indicating churn. Example:")
+    st.write("Your CSV should contain customer features and a binary target column indicating churn. Example:")
     
     sample_data = pd.DataFrame({
-        'customer_id': ['C001', 'C002', 'C003'],
-        'age': [25, 45, 35],
-        'tenure': [12, 36, 24],
-        'monthly_charges': [50.0, 80.0, 65.0],
-        'total_charges': [600.0, 2880.0, 1560.0],
-        'contract_type': ['Month-to-month', 'Two year', 'One year'],
-        'churn': [1, 0, 0]
+        'customer_id': ['C001', 'C002', 'C003', 'C004'],
+        'age': [25, 45, 35, 28],
+        'tenure_months': [12, 36, 24, 8],
+        'monthly_charges': [50.0, 80.0, 65.0, 45.0],
+        'total_charges': [600.0, 2880.0, 1560.0, 360.0],
+        'contract_type': ['Month-to-month', 'Two year', 'One year', 'Month-to-month'],
+        'payment_method': ['Credit card', 'Bank transfer', 'Electronic check', 'Credit card'],
+        'churn': [1, 0, 0, 1]  # Binary: 1 = churned, 0 = stayed
     })
     
+    st.write("**Key requirements:**")
+    st.write("• Target column must have exactly 2 unique values (e.g., 0/1, Yes/No, True/False)")
+    st.write("• Include customer features like demographics, usage, and service information")
+    st.write("• Remove any customer identifiers before analysis (they'll be ignored during preprocessing)")
+    
     st.dataframe(sample_data, use_container_width=True)
+    
+    # Generate sample dataset button
+    if st.button("📥 Download Sample Dataset", help="Download a sample CSV file to test the application"):
+        # Create a larger sample dataset
+        np.random.seed(42)
+        n_samples = 1000
+        
+        sample_dataset = pd.DataFrame({
+            'customer_id': [f'C{i:04d}' for i in range(1, n_samples + 1)],
+            'age': np.random.randint(18, 70, n_samples),
+            'tenure_months': np.random.randint(1, 72, n_samples),
+            'monthly_charges': np.round(np.random.uniform(20, 120, n_samples), 2),
+            'total_charges': np.round(np.random.uniform(50, 8000, n_samples), 2),
+            'contract_type': np.random.choice(['Month-to-month', 'One year', 'Two year'], n_samples),
+            'payment_method': np.random.choice(['Electronic check', 'Mailed check', 'Bank transfer', 'Credit card'], n_samples),
+            'internet_service': np.random.choice(['DSL', 'Fiber optic', 'No'], n_samples),
+            'online_security': np.random.choice(['Yes', 'No'], n_samples),
+            'tech_support': np.random.choice(['Yes', 'No'], n_samples),
+            'streaming_tv': np.random.choice(['Yes', 'No'], n_samples),
+            'paperless_billing': np.random.choice([0, 1], n_samples),
+            'senior_citizen': np.random.choice([0, 1], n_samples)
+        })
+        
+        # Create realistic churn based on features
+        churn_prob = (
+            0.1 +  # base rate
+            0.3 * (sample_dataset['contract_type'] == 'Month-to-month') +
+            0.2 * (sample_dataset['tenure_months'] < 12) +
+            0.1 * (sample_dataset['monthly_charges'] > 80) +
+            0.1 * (sample_dataset['payment_method'] == 'Electronic check') +
+            0.1 * (sample_dataset['senior_citizen'] == 1)
+        )
+        sample_dataset['churn'] = np.random.binomial(1, np.minimum(churn_prob, 0.8), n_samples)
+        
+        csv = sample_dataset.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Sample Dataset (CSV)",
+            data=csv,
+            file_name="sample_churn_data.csv",
+            mime="text/csv",
+            help="This sample dataset contains 1000 customers with realistic churn patterns"
+        )

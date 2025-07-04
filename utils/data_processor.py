@@ -120,7 +120,20 @@ class DataProcessor:
                 if unique_vals != [0, 1]:
                     data[target_column] = data[target_column].map({unique_vals[0]: 0, unique_vals[1]: 1})
         else:
-            raise ValueError(f"Target variable must have exactly 2 unique values, found {len(target_values)}")
+            # Provide more helpful error message
+            st.error(f"❌ The selected target column '{target_column}' has {len(target_values)} unique values.")
+            st.error("For churn prediction, the target column should contain exactly 2 values (e.g., 0/1, Yes/No, True/False).")
+            
+            if len(target_values) <= 10:
+                st.write("**Available values in this column:**")
+                value_counts = data[target_column].value_counts()
+                st.dataframe(value_counts.to_frame('Count'), use_container_width=True)
+                st.info("💡 If this column represents churn, you may need to create a binary version (e.g., convert 'Active'/'Inactive' to 0/1).")
+            else:
+                st.write(f"**Sample values:** {list(target_values[:10])}")
+                st.info("💡 This appears to be a continuous or high-cardinality categorical variable. Please select a binary column that indicates churn status.")
+            
+            raise ValueError(f"Target variable must have exactly 2 unique values for binary classification, found {len(target_values)}")
         
         return data
     
