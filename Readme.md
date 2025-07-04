@@ -102,5 +102,7 @@ This is a Streamlit-based web application designed for comprehensive customer ch
 
 
 ## User Preferences
-
 Preferred communication style: Simple, everyday language.
+
+## Working Application
+https://customer-churn-analyzer.streamlit.app/
