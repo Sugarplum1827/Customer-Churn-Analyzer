@@ -30,7 +30,7 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric("Total Customers", len(data))
 with col2:
-    churn_count = data[target_column].sum()
+    churn_count = int(data[target_column].sum())
     st.metric("Churned Customers", churn_count)
 with col3:
     churn_rate = (churn_count / len(data) * 100)
@@ -117,7 +117,7 @@ elif analysis_type == "Churn Rate by Segments":
             title=f'Churn Rate by {col1_seg} and {col2_seg}',
             labels={'churn_rate': 'Churn Rate (%)', 'segment': 'Segment'}
         )
-        fig_segments.update_xaxis(tickangle=45)
+        fig_segments.update_layout(xaxis_tickangle=45)
         st.plotly_chart(fig_segments, use_container_width=True)
         
         # Show detailed table

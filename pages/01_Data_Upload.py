@@ -41,7 +41,7 @@ if uploaded_file is not None:
             st.write("**Data Types:**")
             dtype_df = pd.DataFrame({
                 'Column': data.dtypes.index,
-                'Data Type': data.dtypes.values
+                'Data Type': data.dtypes.astype(str).values
             })
             st.dataframe(dtype_df, use_container_width=True)
         
