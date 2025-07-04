@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from utils.data_processor import DataProcessor
+from utils.transaction_processor import TransactionProcessor
 
 st.title("📁 Data Upload & Preprocessing")
 
@@ -16,7 +17,43 @@ if uploaded_file is not None:
     try:
         # Load data
         data = pd.read_csv(uploaded_file)
-        st.session_state.data = data
+        
+        # Check if this is transaction data that needs conversion
+        transaction_columns = ['Name', 'Email', 'Product', 'Transaction Date']
+        is_transaction_data = all(col in data.columns for col in transaction_columns)
+        
+        if is_transaction_data:
+            st.info("📊 Detected transaction data. Converting to customer-level churn dataset...")
+            
+            # Allow user to configure conversion parameters
+            col1, col2 = st.columns(2)
+            with col1:
+                churn_days = st.number_input(
+                    "Days to define churn",
+                    min_value=7,
+                    max_value=365,
+                    value=30,
+                    help="Customers with no activity for this many days are considered churned"
+                )
+            with col2:
+                # Auto-calculate observation date (30 days before max date by default)
+                max_date = pd.to_datetime(data['Transaction Date']).max()
+                default_obs_date = max_date - pd.Timedelta(days=churn_days)
+                observation_date = st.date_input(
+                    "Observation cutoff date",
+                    value=default_obs_date.date(),
+                    help="Date to split historical vs future data"
+                )
+            
+            if st.button("🔄 Convert Transaction Data", type="primary"):
+                with st.spinner("Converting transaction data to churn dataset..."):
+                    processor = TransactionProcessor()
+                    data = processor.convert_transactions_to_churn_data(
+                        data, observation_date, churn_days
+                    )
+                    st.session_state.data = data
+        else:
+            st.session_state.data = data
         
         st.success(f"✅ Data uploaded successfully! Shape: {data.shape}")
         
