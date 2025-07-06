@@ -8,6 +8,22 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from utils.model_trainer import ModelTrainer
 
+# Initialize session state
+if 'processed_data' not in st.session_state:
+    st.session_state.processed_data = None
+if 'feature_columns' not in st.session_state:
+    st.session_state.feature_columns = []
+if 'target_column' not in st.session_state:
+    st.session_state.target_column = None
+if 'models' not in st.session_state:
+    st.session_state.models = {}
+if 'model_results' not in st.session_state:
+    st.session_state.model_results = {}
+if 'X_test' not in st.session_state:
+    st.session_state.X_test = None
+if 'y_test' not in st.session_state:
+    st.session_state.y_test = None
+
 st.title("🤖 Model Training & Evaluation")
 
 if st.session_state.processed_data is None:
